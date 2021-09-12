@@ -1,0 +1,114 @@
+---
+title: "Shopify Data Challenge"
+author: "Richard Chen"
+date: "9/11/2021"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_packages, message=FALSE, warning=FALSE}
+library(dplyr)
+```
+
+```{r load_data}
+# download dataset from Google Sheets, rename to `shopify.csv`
+shopify <- read.csv("~/Downloads/shopify.csv")
+```
+
+```{r naive_calculation}
+# naive AOV check
+mean(shopify$order_amount)
+```
+
+## Question 1
+
+### Part a
+
+Although the naive calculation of AOV is not necessarily incorrect, it is a sub-optimal evaluation of the data. The naive approach would be appropriate if both the total items and order amounts of all the orders were within a certain order of magnitude, but that is not the case. Although most orders (~97%) have less than 10 items and most shoes are priced under $200.00, outliers with orders sizes of 2000 items and shoes priced at \$25,725.00 drastically impact the naive calculation of AOV. Despite these outliers making up roughly 3% of all orders, their extremity is so many magnitudes larger than the other 97% of orders that a naive calculation of AOV is severely affected.
+
+I explored various approaches to better evaluate the data and report an AOV more reflective of the overall dataset. My methods included removing orders that exceeded a threshold for `order_amount` that I set at $10,000.00, removing orders that exceeded a threshold for `total_items` set at 10, examining the median order value instead, and calculating a mean item value of each shoe as opposed to each order.
+
+I set the thresholds for `order_amount` and `total_items` to $10,000.00 and 10 respectively as a result of a quick overview of the data. The largest percent increase in `order_amount` was from \$1760.00 to \$25,725.00, and from 8 to 2000 for `total_itmes`, so I felt that these thresholds were appropriate given the extreme difference in magnitude for these orders. 
+
+
+```{r alternative_methods, results=FALSE}
+# remove orders with high totals (arbitrary))
+shopify %>% 
+  filter(order_amount < 10000) %>%
+  summarise(mean(order_amount))
+
+# remove orders with high number of items (arbitrary)
+shopify %>% 
+  filter(total_items < 10) %>%
+  summarise(mean(order_amount))
+
+# look at median order value instead of mean
+shopify %>% 
+  summarise(median(order_amount))
+
+# look at mean 'item' value of all shoes sold
+sum(shopify$order_amount) / sum(shopify$total_items)
+
+# check shoe price is same for all orders of every shop, 
+#   ensuring `order_amount` is not an error in reporting
+#   for orders with extremely high amount totals
+shop_shoe_price <- shopify %>% 
+  mutate(shoe_price = order_amount / total_items) %>%
+  select(shoe_price, shop_id) %>%
+  distinct()
+```
+
+Through another check, and using a more grounded method in detecting outliers via IQR rather than eyeballing it as above, I calculated the AOV as \$293.71, not too far off from the AOV of \$302.58 above.
+
+```{r iqr, results=FALSE} 
+# check AOV after removing IQR outliers
+quantiles <- quantile(shopify$order_amount, probs = c(.25, .75), na.rm = FALSE)
+iqr <- IQR(shopify$order_amount)
+up <-  quantiles[2] + 1.5*iqr
+low <- quantiles[1] - 1.5*iqr 
+shopify <- shopify %>%
+  mutate(iqr_outlier = case_when(order_amount > up ~ 1,
+                                 order_amount < up ~ 0))
+
+shopify %>%
+  filter(iqr_outlier == 0) %>%
+  summarise(mean(order_amount))
+```
+
+### Part b
+
+I ultimately decided to calculate a AOV that did not include the two shops with `shop_id` 42 and 78. Shop 78 appears to sell a form of high-end luxury shoe priced at $25,725.00 per shoe. Shop 42 appears to sell shoes in bulk orders of 2000 items, and their shoes are also the second most expensive priced at \$352.00. As these two shops are drastically different from the other 98 shops in terms of the market they are targeting (extremely high-end clients and mass distributors or retail centers), I decided to remove them and their orders from the AOV calculation. 
+
+### Part c 
+As a result, I calculated the AOV as \$300.16, much more reasonable than the initial naive calculation of \$3145.13.
+
+```{r alternative_methods2}
+# calculate AOV without shops 42 and 78
+shopify %>% 
+  filter(shop_id != 42 & shop_id != 78) %>%
+  summarise(mean(order_amount))
+```
+
+
+## Question 2
+
+Please see attached file for SQL queries.
+
+
+### Part a
+
+Speedy Express shipped a total of 54 orders.
+
+### Part b
+
+Peacock had the most orders with 40.
+
+### Part c
+
+Boston Crab Meat was the most ordered product by customers in Germany with a total quantity of 160 units.
