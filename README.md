@@ -1,5 +1,4 @@
-# shopify
-Shopify Data Challenge 
+# Shopify Data Challenge 
 
 Code, discussion, and solutions for Question 1 can be found in the `shopify.html` file, generated as an output from `shopify.Rmd`.
 
